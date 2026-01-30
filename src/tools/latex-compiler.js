@@ -1,0 +1,327 @@
+import { spawn } from 'child_process';
+import fs from 'fs/promises';
+import path from 'path';
+
+/**
+ * LaTeX Compiler - Compiles LaTeX documents with error handling
+ */
+class LatexCompiler {
+  constructor(workspacePath, options = {}) {
+    this.workspacePath = workspacePath;
+    this.engine = options.engine || 'pdflatex';
+    this.timeout = options.timeout || 60000; // 60 seconds
+    this.maxRetries = options.maxRetries || 2;
+  }
+
+  /**
+   * Compile a LaTeX file to PDF
+   */
+  async compile(texFile, options = {}) {
+    const retries = options.retries || this.maxRetries;
+
+    console.log(`📄 Compiling ${path.basename(texFile)}...`);
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const result = await this._runCompilation(texFile);
+
+        if (result.success) {
+          console.log('✓ LaTeX compilation successful');
+          return result;
+        }
+
+        // If compilation failed, try to parse errors
+        const errors = this._parseErrors(result.stdout + result.stderr);
+
+        if (attempt < retries) {
+          console.log(`⚠️  Compilation failed (attempt ${attempt + 1}/${retries + 1})`);
+          console.log('Errors found:', errors.slice(0, 3));
+        } else {
+          console.log('❌ Compilation failed after all retries');
+          return {
+            success: false,
+            errors,
+            stdout: result.stdout,
+            stderr: result.stderr
+          };
+        }
+      } catch (error) {
+        if (attempt >= retries) {
+          throw error;
+        }
+      }
+    }
+  }
+
+  /**
+   * Run the LaTeX compilation process
+   */
+  async _runCompilation(texFile) {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '-interaction=nonstopmode',
+        '-output-directory=' + this.workspacePath,
+        texFile
+      ];
+
+      const process = spawn(this.engine, args, {
+        cwd: this.workspacePath
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      process.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      process.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      process.on('close', (code) => {
+        resolve({
+          success: code === 0,
+          stdout,
+          stderr,
+          exitCode: code
+        });
+      });
+
+      process.on('error', (error) => {
+        reject({
+          success: false,
+          error: error.message
+        });
+      });
+
+      // Set timeout
+      const timer = setTimeout(() => {
+        process.kill();
+        reject({
+          success: false,
+          error: 'Compilation timeout'
+        });
+      }, this.timeout);
+
+      process.on('close', () => clearTimeout(timer));
+    });
+  }
+
+  /**
+   * Parse LaTeX error messages
+   */
+  _parseErrors(output) {
+    const errors = [];
+    const lines = output.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Look for error patterns
+      if (line.startsWith('!')) {
+        const error = {
+          type: 'error',
+          message: line.substring(1).trim(),
+          context: []
+        };
+
+        // Get surrounding lines for context
+        for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+          if (lines[j].trim()) {
+            error.context.push(lines[j]);
+          }
+        }
+
+        errors.push(error);
+      }
+
+      // Look for warnings
+      if (line.includes('Warning:')) {
+        errors.push({
+          type: 'warning',
+          message: line.trim()
+        });
+      }
+
+      // Look for missing files
+      if (line.includes('! LaTeX Error: File') && line.includes('not found')) {
+        errors.push({
+          type: 'missing_file',
+          message: line.trim()
+        });
+      }
+
+      // Look for undefined references
+      if (line.includes('undefined reference') || line.includes('undefined control sequence')) {
+        errors.push({
+          type: 'undefined',
+          message: line.trim()
+        });
+      }
+    }
+
+    return errors;
+  }
+
+  /**
+   * Check if LaTeX is installed
+   */
+  async checkInstallation() {
+    try {
+      const result = await this._runCommand(this.engine, ['--version']);
+      return result.success;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get LaTeX version
+   */
+  async getVersion() {
+    return new Promise((resolve, reject) => {
+      const process = spawn(this.engine, ['--version']);
+
+      let output = '';
+
+      process.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+
+      process.on('close', (code) => {
+        if (code === 0) {
+          const firstLine = output.split('\n')[0];
+          resolve(firstLine.trim());
+        } else {
+          reject(new Error('Failed to get version'));
+        }
+      });
+    });
+  }
+
+  /**
+   * Clean auxiliary files generated by LaTeX
+   */
+  async cleanAuxFiles() {
+    const auxExtensions = ['.aux', '.log', '.out', '.toc', '.lof', '.lot', '.fls', '.fdb_latexmk'];
+
+    try {
+      const files = await fs.readdir(this.workspacePath);
+
+      for (const file of files) {
+        const ext = path.extname(file);
+        if (auxExtensions.includes(ext)) {
+          await fs.unlink(path.join(this.workspacePath, file));
+          console.log(`  Cleaned: ${file}`);
+        }
+      }
+
+      console.log('✓ Auxiliary files cleaned');
+    } catch (error) {
+      console.error('Failed to clean aux files:', error.message);
+    }
+  }
+
+  /**
+   * Compile with BibTeX support
+   */
+  async compileWithBibtex(texFile) {
+    console.log('📚 Compiling with BibTeX...');
+
+    // First LaTeX run
+    await this._runCompilation(texFile);
+
+    // Run BibTeX
+    const baseName = path.basename(texFile, '.tex');
+    await this._runCommand('bibtex', [baseName]);
+
+    // Second LaTeX run
+    await this._runCompilation(texFile);
+
+    // Third LaTeX run (for references)
+    const result = await this._runCompilation(texFile);
+
+    console.log('✓ BibTeX compilation complete');
+    return result;
+  }
+
+  /**
+   * Run a command and return result
+   */
+  async _runCommand(command, args) {
+    return new Promise((resolve, reject) => {
+      const process = spawn(command, args, {
+        cwd: this.workspacePath
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      process.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      process.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      process.on('close', (code) => {
+        resolve({
+          success: code === 0,
+          stdout,
+          stderr,
+          exitCode: code
+        });
+      });
+
+      process.on('error', (error) => {
+        reject({
+          success: false,
+          error: error.message
+        });
+      });
+    });
+  }
+
+  /**
+   * Generate error report for LLM to fix
+   */
+  generateErrorReport(errors) {
+    const report = {
+      summary: `Found ${errors.length} issues`,
+      errors: errors.map(e => ({
+        type: e.type,
+        message: e.message,
+        suggestion: this._getSuggestion(e)
+      }))
+    };
+
+    return report;
+  }
+
+  /**
+   * Get suggestion for fixing an error
+   */
+  _getSuggestion(error) {
+    if (error.type === 'missing_file') {
+      return 'Check if the file exists and the path is correct. Use \\graphicspath for images.';
+    }
+
+    if (error.type === 'undefined') {
+      return 'Check for typos in command names or missing package imports.';
+    }
+
+    if (error.message.includes('Undefined control sequence')) {
+      return 'This command is not defined. Add the required package or define the command.';
+    }
+
+    if (error.message.includes('Missing $')) {
+      return 'Math mode not properly opened/closed. Check for missing $ or $$ delimiters.';
+    }
+
+    return 'Review the error context and fix accordingly.';
+  }
+}
+
+export default LatexCompiler;

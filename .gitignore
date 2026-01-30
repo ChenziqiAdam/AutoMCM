@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables (keep .env.example)
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# User workspaces (generated data)
+workspace/
+
+# OS files
+.DS_Store
+
+# Temporary files
+*.tmp
+temp/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# LaTeX intermediate files (in workspace)
+*.aux
+*.out
+*.toc
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+
+# Others
+CLAUDE.md
+.claude/
+PLAN.md
+PROCESS.md

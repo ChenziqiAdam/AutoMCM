@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoMCM - Mathematical Contest Modeling Workspace</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.28/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.28/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1 class="app-title">AutoMCM</h1>
+        <div class="workspace-selector">
+          <select id="workspace-select">
+            <option value="">Select Workspace...</option>
+          </select>
+          <button id="new-workspace" class="btn-primary" title="Create new workspace">+ New</button>
+          <button id="refresh-workspaces" class="btn-icon" title="Refresh workspaces">⟳</button>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="phase-indicator">
+          <div class="phase-item" data-phase="planning">
+            <span class="phase-icon">●</span>
+            <span class="phase-label">Planning</span>
+            <div class="phase-progress-bar"><div class="phase-progress-fill"></div></div>
+          </div>
+          <div class="phase-item" data-phase="modeling">
+            <span class="phase-icon">●</span>
+            <span class="phase-label">Modeling</span>
+            <div class="phase-progress-bar"><div class="phase-progress-fill"></div></div>
+          </div>
+          <div class="phase-item" data-phase="writing">
+            <span class="phase-icon">●</span>
+            <span class="phase-label">Writing</span>
+            <div class="phase-progress-bar"><div class="phase-progress-fill"></div></div>
+          </div>
+        </div>
+        <div class="status-display">
+          <span id="current-task">Ready</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="main-layout">
+      <!-- Left Panel: AUTOMCM.md Editor -->
+      <div class="panel editor-panel">
+        <div class="panel-header">
+          <h2>AUTOMCM.md</h2>
+          <button id="save-automcm" class="btn-primary">Save</button>
+        </div>
+        <div class="panel-content">
+          <div id="editor"></div>
+        </div>
+      </div>
+
+      <!-- Resizer 1 -->
+      <div class="resizer" data-resizer="1"></div>
+
+      <!-- Middle Panel: Agent Console -->
+      <div class="panel console-panel">
+        <div class="panel-header">
+          <h2>Agent Console</h2>
+          <div class="header-controls">
+            <button id="run-planning" class="btn-primary" title="Start planning phase">▶ Plan</button>
+            <button id="run-modeling" class="btn-primary" title="Start modeling phase" disabled>▶ Model</button>
+            <button id="run-writing" class="btn-primary" title="Start writing phase" disabled>▶ Write</button>
+            <button id="run-complete" class="btn-success" title="Run complete workflow">▶ Complete</button>
+            <button id="stop-agent" class="btn-danger" title="Stop execution" style="display: none;">■ Stop</button>
+            <button id="clear-console" class="btn-icon" title="Clear console">🗑</button>
+          </div>
+        </div>
+        <div class="panel-content">
+          <div id="console-output"></div>
+        </div>
+      </div>
+
+      <!-- Resizer 2 -->
+      <div class="resizer" data-resizer="2"></div>
+
+      <!-- Right Panel: Preview -->
+      <div class="panel preview-panel">
+        <div class="panel-header">
+          <h2>Preview</h2>
+          <div class="preview-tabs">
+            <button class="tab-btn active" data-tab="rendered">Rendered</button>
+            <button class="tab-btn" data-tab="artifacts">Artifacts</button>
+            <button class="tab-btn" data-tab="data">Data</button>
+            <button class="tab-btn" data-tab="paper">Paper</button>
+            <button class="tab-btn" data-tab="equations">Equations</button>
+            <button class="tab-btn" data-tab="validation">Validation</button>
+          </div>
+        </div>
+        <div class="panel-content">
+          <div id="preview-rendered" class="tab-content active"></div>
+          <div id="preview-artifacts" class="tab-content">
+            <div id="artifacts-list"></div>
+          </div>
+          <div id="preview-data" class="tab-content">
+            <div class="data-controls">
+              <button id="upload-problem-pdf" class="btn-primary">📄 Upload Problem PDF</button>
+              <button id="upload-data" class="btn-primary">📊 Upload Data</button>
+            </div>
+            <div id="problem-info" style="margin: 15px 0;"></div>
+            <h3 style="margin: 20px 0 10px 0;">Uploaded Data Files</h3>
+            <div id="data-files-list"></div>
+          </div>
+          <div id="preview-paper" class="tab-content">
+            <div id="paper-viewer">
+              <p class="placeholder-text">Paper will appear here after writing phase completes.</p>
+            </div>
+          </div>
+          <div id="preview-equations" class="tab-content">
+            <h3>Equation Preview</h3>
+            <div id="equation-viewer">
+              <p class="placeholder-text">Equations will appear here as you work.</p>
+            </div>
+          </div>
+          <div id="preview-validation" class="tab-content">
+            <h3>Validation Status</h3>
+            <div id="validation-status">
+              <div class="validation-item">
+                <span class="validation-label">Dimensional Consistency:</span>
+                <span id="dim-status" class="status-badge">Not checked</span>
+              </div>
+              <div class="validation-item">
+                <span class="validation-label">Sensitivity Analysis:</span>
+                <span id="sens-status" class="status-badge">Not run</span>
+              </div>
+              <div class="validation-item">
+                <span class="validation-label">Variable Registry:</span>
+                <span id="var-status" class="status-badge">Not validated</span>
+              </div>
+            </div>
+            <div id="validation-details" style="margin-top: 20px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <footer class="status-bar">
+      <div class="status-left">
+        <span id="status-workspace">No workspace loaded</span>
+      </div>
+      <div class="status-right">
+        <span id="status-progress"></span>
+      </div>
+    </footer>
+
+    <!-- New Workspace Modal -->
+    <div id="new-workspace-modal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <h3>Create New Workspace</h3>
+        <input type="text" id="workspace-name-input" placeholder="Enter workspace name..." />
+        <p class="modal-hint">Use only letters, numbers, dashes, and underscores</p>
+        <div class="modal-buttons">
+          <button id="modal-create" class="btn-primary">Create</button>
+          <button id="modal-cancel" class="btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

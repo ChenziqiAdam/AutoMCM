@@ -1,0 +1,55 @@
+# AutoMCM Configuration
+
+llm:
+  # Primary LLM configuration
+  provider: openai
+  api_key: your_api_key_here
+  model: gpt-4o
+  base_url: ""  # Optional: for custom endpoints
+
+  # Task-specific LLM overrides (optional)
+  # Leave empty to use primary configuration
+  # task_overrides:
+  #   researcher:
+  #     provider: openai
+  #     api_key: your_api_key_here
+  #     model: gpt-4o
+  #   modeler:
+  #     provider: openai
+  #     api_key: your_api_key_here
+  #     model: gpt-4o
+  #   writer:
+  #     provider: openai
+  #     api_key: your_api_key_here
+  #     model: gpt-4o
+
+tools:
+  python_env: "local"  # options: "local", "docker", "conda"
+  latex_engine: "pdflatex"  # options: "pdflatex", "tectonic"
+  symbolic_math: "sympy"
+
+paths:
+  workspace: "./workspace"
+  templates: "./templates"
+  artifacts: "./artifacts"
+
+planning:
+  enable_approval_checkpoint: true
+  auto_save_interval: 300  # seconds
+
+execution:
+  parallel_clones: 3
+  max_retries: 3
+  timeout: 600  # seconds
+
+validation:
+  dimensional_analysis: true
+  sensitivity_analysis: true
+  assumption_checking: true
+
+web_search:
+  enable_real_search: true
+  serpapi_key: ${SERPAPI_KEY}  # Optional: for Google Scholar
+  arxiv_enabled: true
+  max_results: 10
+  timeout: 10000
