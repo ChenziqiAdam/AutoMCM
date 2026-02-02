@@ -6,7 +6,16 @@ let planResult = null;
 let workflowState = {
   planningComplete: false,
   modelingComplete: false,
-  writingComplete: false
+  writingComplete: false,
+  analysisData: {
+    equations: [],
+    validation: {
+      dimensional: null,
+      sensitivity: null,
+      variable: null
+    },
+    sensitivityResults: null
+  }
 };
 
 // Initialize app
@@ -167,9 +176,9 @@ function switchTab(tabName) {
     loadPaperPreview();
   }
 
-  // Load equations when switching to equations tab
-  if (tabName === 'equations' && currentWorkspace) {
-    loadEquationsFromArtifacts();
+  // Load analysis when switching to analysis tab
+  if (tabName === 'analysis' && currentWorkspace) {
+    restoreAnalysisData();
   }
 }
 
@@ -328,7 +337,16 @@ async function loadWorkspace(workspaceName) {
     workflowState = {
       planningComplete: false,
       modelingComplete: false,
-      writingComplete: false
+      writingComplete: false,
+      analysisData: {
+        equations: [],
+        validation: {
+          dimensional: null,
+          sensitivity: null,
+          variable: null
+        },
+        sensitivityResults: null
+      }
     };
     planResult = null;
 
@@ -337,6 +355,7 @@ async function loadWorkspace(workspaceName) {
     updateArtifactsList([]);
     document.getElementById('problem-info').innerHTML = '';
     clearConsole();
+    clearAnalysisTab();
 
     const result = await window.electronAPI.loadWorkspace(workspaceName);
 
@@ -359,6 +378,12 @@ async function loadWorkspace(workspaceName) {
 
       // Load data files for the new workspace
       await refreshDataFiles();
+
+      // Restore analysis data if on Analysis tab
+      const activeTab = document.querySelector('.tab-btn.active');
+      if (activeTab && activeTab.getAttribute('data-tab') === 'analysis') {
+        await restoreAnalysisData();
+      }
 
       // Check for problem statement
       try {
@@ -683,23 +708,29 @@ function setupEventListeners() {
 
 // Setup Agent Event Listeners
 function setupAgentListeners() {
+  console.log('🔧 Setting up agent event listeners...');
+
   // Listen for agent logs
   window.electronAPI.onAgentLog((logData) => {
+    console.log('📝 Agent log received:', logData);
     logToConsole(logData.type, logData.message);
   });
 
   // Listen for phase changes
   window.electronAPI.onPhaseChange((phase) => {
+    console.log('🔄 Phase change:', phase);
     updatePhase(phase);
   });
 
   // Listen for agent errors
   window.electronAPI.onAgentError((error) => {
+    console.log('❌ Agent error:', error);
     logToConsole('error', `Agent error: ${error}`);
   });
 
   // Listen for artifact creation events
   window.electronAPI.onArtifactCreated(async (data) => {
+    console.log('📦 Artifact created:', data);
     logToConsole('success', `📦 Artifact created: ${data.name}`);
 
     // Refresh workspace to show new artifact
@@ -712,27 +743,67 @@ function setupAgentListeners() {
   });
 
   // Listen for equations extraction
-  window.electronAPI.onEquationsExtracted((equations) => {
-    logToConsole('info', `📐 ${equations.length} equations extracted`);
-    equations.forEach(eq => {
-      addEquationToViewer(eq.latex, eq.label);
+  if (window.electronAPI.onEquationsExtracted) {
+    window.electronAPI.onEquationsExtracted((equations) => {
+      console.log('📐 Equations extracted:', equations);
+      if (equations && equations.length > 0) {
+        logToConsole('info', `📐 ${equations.length} equations extracted`);
+        // Clear placeholder first
+        const viewer = document.getElementById('equation-viewer');
+        const placeholder = viewer.querySelector('.placeholder-text');
+        if (placeholder) placeholder.remove();
+
+        equations.forEach(eq => {
+          addEquationToViewer(eq.latex, eq.label);
+        });
+
+        // Save to workflow state
+        workflowState.analysisData.equations = equations;
+        saveWorkflowState(currentWorkspace);
+      } else {
+        console.log('📐 No equations found in artifacts');
+        logToConsole('warning', '📐 No equations found - modeling output may not contain LaTeX formulas');
+      }
     });
-  });
+  }
 
   // Listen for sensitivity results
-  window.electronAPI.onSensitivityResults((data) => {
-    logToConsole('success', '📊 Sensitivity analysis complete');
-    updateValidationStatus('sensitivity', 'pass', data.content.substring(0, 200));
-    // Display full sensitivity results in Validation tab
-    displaySensitivityResults(data.content);
-  });
+  if (window.electronAPI.onSensitivityResults) {
+    window.electronAPI.onSensitivityResults((data) => {
+      console.log('📊 Sensitivity results received:', data);
+      logToConsole('success', '📊 Sensitivity analysis complete');
+      updateValidationStatus('sensitivity', 'pass', data.content ? data.content.substring(0, 200) : '');
+      // Display full sensitivity results in Analysis tab
+      if (data.content) {
+        displaySensitivityResults(data.content);
+        // Save to workflow state
+        workflowState.analysisData.sensitivityResults = data.content;
+        saveWorkflowState(currentWorkspace);
+      }
+    });
+  }
 
   // Listen for validation updates
-  window.electronAPI.onValidationUpdate((status) => {
-    if (status.dimensional) updateValidationStatus('dimensional', status.dimensional);
-    if (status.sensitivity) updateValidationStatus('sensitivity', status.sensitivity);
-    if (status.variable) updateValidationStatus('variable', status.variable);
-  });
+  if (window.electronAPI.onValidationUpdate) {
+    window.electronAPI.onValidationUpdate((status) => {
+      console.log('✓ Validation update:', status);
+      if (status.dimensional) {
+        updateValidationStatus('dimensional', status.dimensional);
+        workflowState.analysisData.validation.dimensional = status.dimensional;
+      }
+      if (status.sensitivity) {
+        updateValidationStatus('sensitivity', status.sensitivity);
+        workflowState.analysisData.validation.sensitivity = status.sensitivity;
+      }
+      if (status.variable) {
+        updateValidationStatus('variable', status.variable);
+        workflowState.analysisData.validation.variable = status.variable;
+      }
+      saveWorkflowState(currentWorkspace);
+    });
+  }
+
+  console.log('✅ Agent event listeners setup complete');
 }
 
 // Agent Execution Functions
@@ -850,6 +921,25 @@ async function runModelingPhase() {
       logToConsole('success', '✅ Modeling phase complete');
       // Reload workspace to show new artifacts
       await loadWorkspace(currentWorkspace);
+      // Auto-load equations and switch to analysis tab
+      logToConsole('info', '📊 Loading analysis results...');
+      await loadEquationsFromArtifacts();
+      // Save equations to state after loading
+      const viewer = document.getElementById('equation-viewer');
+      const eqBlocks = viewer.querySelectorAll('.equation-block');
+      if (eqBlocks.length > 0) {
+        // Extract equations from viewer and save
+        const equations = [];
+        eqBlocks.forEach(block => {
+          const label = block.querySelector('.equation-label')?.textContent || '';
+          const mathDiv = block.querySelector('div:not(.equation-label)');
+          if (mathDiv) {
+            // Store the rendered HTML for display (we'll use the saved data)
+            equations.push({ latex: '', label, rendered: true });
+          }
+        });
+      }
+      switchTab('analysis');
     } else {
       logToConsole('error', `Modeling failed: ${result.error}`);
     }
@@ -1004,6 +1094,19 @@ async function loadWorkflowState(workspaceName) {
     if (result.success && result.state) {
       workflowState = result.state;
 
+      // Ensure analysisData exists (for backwards compatibility)
+      if (!workflowState.analysisData) {
+        workflowState.analysisData = {
+          equations: [],
+          validation: {
+            dimensional: null,
+            sensitivity: null,
+            variable: null
+          },
+          sensitivityResults: null
+        };
+      }
+
       // Restore planResult from workflow state
       if (workflowState.planResult) {
         planResult = workflowState.planResult;
@@ -1025,7 +1128,16 @@ async function loadWorkflowState(workspaceName) {
       workflowState = {
         planningComplete: false,
         modelingComplete: false,
-        writingComplete: false
+        writingComplete: false,
+        analysisData: {
+          equations: [],
+          validation: {
+            dimensional: null,
+            sensitivity: null,
+            variable: null
+          },
+          sensitivityResults: null
+        }
       };
       planResult = null;
       updateButtonStates();
@@ -1416,6 +1528,76 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// Clear Analysis tab UI
+function clearAnalysisTab() {
+  // Clear equations viewer
+  const viewer = document.getElementById('equation-viewer');
+  viewer.innerHTML = '<p class="placeholder-text">Complete modeling phase to see equations here.</p>';
+
+  // Reset validation badges
+  const badges = {
+    'dim-status': 'Not checked',
+    'sens-status': 'Not checked',
+    'var-status': 'Not checked'
+  };
+
+  Object.entries(badges).forEach(([id, text]) => {
+    const badge = document.getElementById(id);
+    if (badge) {
+      badge.className = 'status-badge pending';
+      badge.textContent = text;
+    }
+  });
+
+  // Clear validation details
+  const detailsDiv = document.getElementById('validation-details');
+  if (detailsDiv) {
+    detailsDiv.innerHTML = '';
+  }
+}
+
+// Restore analysis data from workflow state or load from artifacts
+async function restoreAnalysisData() {
+  if (!currentWorkspace) return;
+
+  const viewer = document.getElementById('equation-viewer');
+
+  // Try to restore from saved state first
+  if (workflowState.analysisData) {
+    let restored = false;
+
+    // Restore equations
+    if (workflowState.analysisData.equations && workflowState.analysisData.equations.length > 0) {
+      viewer.innerHTML = '';
+      workflowState.analysisData.equations.forEach(eq => {
+        addEquationToViewer(eq.latex, eq.label);
+      });
+      logToConsole('info', `📐 Restored ${workflowState.analysisData.equations.length} equations from saved state`);
+      restored = true;
+    }
+
+    // Restore validation status
+    if (workflowState.analysisData.validation) {
+      const val = workflowState.analysisData.validation;
+      if (val.dimensional) updateValidationStatus('dimensional', val.dimensional);
+      if (val.sensitivity) updateValidationStatus('sensitivity', val.sensitivity);
+      if (val.variable) updateValidationStatus('variable', val.variable);
+    }
+
+    // Restore sensitivity results
+    if (workflowState.analysisData.sensitivityResults) {
+      displaySensitivityResults(workflowState.analysisData.sensitivityResults);
+      logToConsole('info', '📊 Restored sensitivity analysis results');
+      restored = true;
+    }
+
+    if (restored) return;
+  }
+
+  // Fallback: Load from artifacts if no saved state
+  await loadEquationsFromArtifacts();
+}
+
 // Load equations from artifacts (manual refresh)
 async function loadEquationsFromArtifacts() {
   if (!currentWorkspace) return;
@@ -1427,40 +1609,62 @@ async function loadEquationsFromArtifacts() {
     viewer.innerHTML = '';
 
     let foundEquations = false;
+    let checkedFiles = [];
 
     // Try to load from modeling-phase-result.md
     try {
       const modelResult = await window.electronAPI.readArtifact(currentWorkspace, 'modeling-phase-result.md');
       if (modelResult.success) {
+        checkedFiles.push('modeling-phase-result.md');
         const equations = extractEquationsFromContent(modelResult.content);
-        equations.forEach(eq => {
-          addEquationToViewer(eq.latex, eq.label);
-          foundEquations = true;
-        });
+        console.log(`Found ${equations.length} equations in modeling-phase-result.md`);
+        if (equations.length > 0) {
+          equations.forEach(eq => {
+            addEquationToViewer(eq.latex, eq.label);
+            foundEquations = true;
+          });
+        }
       }
     } catch (err) {
-      // Ignore
+      console.log('Could not load modeling-phase-result.md:', err.message);
     }
 
     // Try to load from paper.tex
     try {
       const paperResult = await window.electronAPI.readArtifact(currentWorkspace, '../paper.tex');
       if (paperResult.success) {
+        checkedFiles.push('paper.tex');
         const equations = extractEquationsFromContent(paperResult.content);
-        equations.forEach(eq => {
-          addEquationToViewer(eq.latex, eq.label);
-          foundEquations = true;
-        });
+        console.log(`Found ${equations.length} equations in paper.tex`);
+        if (equations.length > 0) {
+          equations.forEach(eq => {
+            addEquationToViewer(eq.latex, eq.label);
+            foundEquations = true;
+          });
+        }
       }
     } catch (err) {
-      // Ignore
+      console.log('Could not load paper.tex:', err.message);
     }
 
     if (!foundEquations) {
-      viewer.innerHTML = '<p class="placeholder-text">No equations found yet. Run modeling phase first.</p>';
+      viewer.innerHTML = `
+        <div class="info-message">
+          <p><strong>No equations found</strong></p>
+          <p>Checked files: ${checkedFiles.join(', ')}</p>
+          <p style="margin-top: 10px; font-size: 12px; color: var(--text-secondary);">
+            <strong>Note:</strong> The modeling phase needs to generate equations in LaTeX format (using $$ ... $$ or \\begin{equation}).
+            Currently, the modeling output contains conceptual descriptions but no mathematical formulas.
+          </p>
+        </div>
+      `;
+      logToConsole('info', `📐 No LaTeX equations found in artifacts (checked: ${checkedFiles.join(', ')})`);
+    } else {
+      logToConsole('success', `📐 Loaded equations from artifacts`);
     }
   } catch (error) {
     viewer.innerHTML = '<p class="placeholder-text">Error loading equations.</p>';
+    console.error('Error in loadEquationsFromArtifacts:', error);
   }
 }
 

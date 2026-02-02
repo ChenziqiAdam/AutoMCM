@@ -188,6 +188,35 @@ ipcMain.handle('run-planning-phase', async (event, workspaceName, problemStateme
   try {
     if (!agentService) {
       agentService = new AgentService();
+
+      // Setup ALL event listeners
+      agentService.on('log', (logData) => {
+        mainWindow?.webContents.send('agent-log', logData);
+      });
+
+      agentService.on('phase-change', (phase) => {
+        mainWindow?.webContents.send('phase-change', phase);
+      });
+
+      agentService.on('error', (error) => {
+        mainWindow?.webContents.send('agent-error', error.message);
+      });
+
+      agentService.on('artifact-created', (data) => {
+        mainWindow?.webContents.send('artifact-created', data);
+      });
+
+      agentService.on('equations-extracted', (equations) => {
+        mainWindow?.webContents.send('equations-extracted', equations);
+      });
+
+      agentService.on('sensitivity-results', (data) => {
+        mainWindow?.webContents.send('sensitivity-results', data);
+      });
+
+      agentService.on('validation-update', (status) => {
+        mainWindow?.webContents.send('validation-update', status);
+      });
     }
 
     const workspacePath = path.join(__dirname, '..', 'workspace', workspaceName);
@@ -264,7 +293,7 @@ ipcMain.handle('run-writing-phase', async (event, workspaceName) => {
     if (!agentService) {
       agentService = new AgentService();
 
-      // Setup event listeners
+      // Setup ALL event listeners
       agentService.on('log', (logData) => {
         mainWindow?.webContents.send('agent-log', logData);
       });
@@ -279,6 +308,18 @@ ipcMain.handle('run-writing-phase', async (event, workspaceName) => {
 
       agentService.on('artifact-created', (data) => {
         mainWindow?.webContents.send('artifact-created', data);
+      });
+
+      agentService.on('equations-extracted', (equations) => {
+        mainWindow?.webContents.send('equations-extracted', equations);
+      });
+
+      agentService.on('sensitivity-results', (data) => {
+        mainWindow?.webContents.send('sensitivity-results', data);
+      });
+
+      agentService.on('validation-update', (status) => {
+        mainWindow?.webContents.send('validation-update', status);
       });
     }
 
@@ -302,7 +343,7 @@ ipcMain.handle('run-complete-workflow', async (event, workspaceName, problemStat
     if (!agentService) {
       agentService = new AgentService();
 
-      // Setup event listeners
+      // Setup ALL event listeners
       agentService.on('log', (logData) => {
         mainWindow?.webContents.send('agent-log', logData);
       });
@@ -317,6 +358,18 @@ ipcMain.handle('run-complete-workflow', async (event, workspaceName, problemStat
 
       agentService.on('artifact-created', (data) => {
         mainWindow?.webContents.send('artifact-created', data);
+      });
+
+      agentService.on('equations-extracted', (equations) => {
+        mainWindow?.webContents.send('equations-extracted', equations);
+      });
+
+      agentService.on('sensitivity-results', (data) => {
+        mainWindow?.webContents.send('sensitivity-results', data);
+      });
+
+      agentService.on('validation-update', (status) => {
+        mainWindow?.webContents.send('validation-update', status);
       });
     }
 

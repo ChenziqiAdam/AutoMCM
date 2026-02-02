@@ -93,8 +93,7 @@
             <button class="tab-btn" data-tab="artifacts">Artifacts</button>
             <button class="tab-btn" data-tab="data">Data</button>
             <button class="tab-btn" data-tab="paper">Paper</button>
-            <button class="tab-btn" data-tab="equations">Equations</button>
-            <button class="tab-btn" data-tab="validation">Validation</button>
+            <button class="tab-btn" data-tab="analysis">Analysis</button>
           </div>
         </div>
         <div class="panel-content">
@@ -116,29 +115,31 @@
               <p class="placeholder-text">Paper will appear here after writing phase completes.</p>
             </div>
           </div>
-          <div id="preview-equations" class="tab-content">
-            <h3>Equation Preview</h3>
-            <div id="equation-viewer">
-              <p class="placeholder-text">Equations will appear here as you work.</p>
-            </div>
-          </div>
-          <div id="preview-validation" class="tab-content">
-            <h3>Validation Status</h3>
-            <div id="validation-status">
-              <div class="validation-item">
-                <span class="validation-label">Dimensional Consistency:</span>
-                <span id="dim-status" class="status-badge">Not checked</span>
-              </div>
-              <div class="validation-item">
-                <span class="validation-label">Sensitivity Analysis:</span>
-                <span id="sens-status" class="status-badge">Not run</span>
-              </div>
-              <div class="validation-item">
-                <span class="validation-label">Variable Registry:</span>
-                <span id="var-status" class="status-badge">Not validated</span>
+          <div id="preview-analysis" class="tab-content">
+            <div class="analysis-section">
+              <h3>📐 Equations</h3>
+              <div id="equation-viewer">
+                <p class="placeholder-text">Equations will appear here after modeling phase.</p>
               </div>
             </div>
-            <div id="validation-details" style="margin-top: 20px;"></div>
+            <div class="analysis-section" style="margin-top: 30px;">
+              <h3>✓ Validation Status</h3>
+              <div id="validation-status">
+                <div class="validation-item">
+                  <span class="validation-label">Dimensional Consistency:</span>
+                  <span id="dim-status" class="status-badge">Not checked</span>
+                </div>
+                <div class="validation-item">
+                  <span class="validation-label">Sensitivity Analysis:</span>
+                  <span id="sens-status" class="status-badge">Not run</span>
+                </div>
+                <div class="validation-item">
+                  <span class="validation-label">Variable Registry:</span>
+                  <span id="var-status" class="status-badge">Not validated</span>
+                </div>
+              </div>
+              <div id="validation-details" style="margin-top: 20px;"></div>
+            </div>
           </div>
         </div>
       </div>

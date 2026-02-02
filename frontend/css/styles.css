@@ -888,3 +888,41 @@ body {
 .btn-secondary:hover {
   background-color: var(--border-color);
 }
+
+/* Analysis Tab Styles */
+.analysis-section {
+  padding: 20px 0;
+}
+
+.analysis-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: var(--accent-blue);
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.analysis-section:not(:first-child) {
+  border-top: 1px solid var(--border-color);
+  padding-top: 30px;
+}
+
+/* Info message for equation viewer */
+.info-message {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-yellow);
+  border-radius: 6px;
+  padding: 20px;
+  margin: 15px 0;
+  color: var(--text-primary);
+}
+
+.info-message p {
+  margin: 8px 0;
+}
+
+.info-message strong {
+  color: var(--accent-yellow);
+}
