@@ -4,8 +4,6 @@
 
 ![logo](assets/aotumcm.png)
 
-**Status**: ✅ Production Ready | **Version**: 1.0.0 | **Last Updated**: 2026-01-30
-
 ## What is AutoMCM?
 
 AutoMCM automates the MCM/ICM competition workflow from problem analysis to submission-ready papers. Unlike general AI tools, it embeds mathematical rigor, dimensional validation, and competition-specific requirements directly into the system.
@@ -138,8 +136,6 @@ Unlike general AI coding assistants:
 ✅ **Competition Standards**: Auto-validates papers against MCM requirements
 ✅ **End-to-End**: From PDF problem to submission-ready LaTeX (not just code snippets)
 ✅ **Reproducible**: All experiments tracked in artifact store
-
-**Estimated MCM Readiness**: 90-95% (human review still recommended)
 
 ## Requirements
 
